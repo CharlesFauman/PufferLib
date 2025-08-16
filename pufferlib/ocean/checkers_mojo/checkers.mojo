@@ -452,7 +452,9 @@ struct Checkers(Copyable, Movable):
         pass
 # --- Public constructors / helpers for Python interop ---
 
-fn make_env(size: Int32 = 8) -> Checkers:
+fn make_env(py_obj: PythonObject) raises -> Checkers:
+    size = Int(py_obj)
+
     tiles = size * size
     env = Checkers(
         observations = List[UInt8](length=UInt(tiles), fill=0),
@@ -463,3 +465,17 @@ fn make_env(size: Int32 = 8) -> Checkers:
     )
     env.c_reset()
     return env
+
+from python import PythonObject
+from python.bindings import PythonModuleBuilder
+import math
+from os import abort
+
+@export
+fn PyInit_checkers_mojo() -> PythonObject:
+    try:
+        var m = PythonModuleBuilder("checkers_mojo")
+        m.def_function[make_env]("make_env", docstring="make a new Checkers environment")
+        return m.finalize()
+    except e:
+        return abort[PythonObject](String("error creating Python Mojo module checkers_mojo:", e))
