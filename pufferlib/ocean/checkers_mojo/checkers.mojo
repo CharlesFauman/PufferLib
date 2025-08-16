@@ -226,7 +226,8 @@ struct Checkers(Copyable, Movable):
         return False
 
     fn is_valid_move(self, m: Move) -> Bool:
-        if self.capture_available() and self.move_size(m) != 2:
+        capture_available = self.capture_available()
+        if capture_available and self.move_size(m) != 2:
             return False
         return self.is_valid_move_no_capture(m)
 
@@ -401,13 +402,13 @@ struct Checkers(Copyable, Movable):
         self.update_piece_counts()
 
     fn add_log(mut self):
-        self.log.perf += 1.0 if self.rewards[0] > 0 else 0.0
+        self.log.perf += 1 if self.rewards[0] > 0 else 0
         self.log.score += self.evaluate_position()
         self.log.episode_length += Float32(self.tick)
         self.log.episode_return += self.rewards[0]
         if self.terminals[0] == 1:
-            self.log.winrate += 1.0 if self.get_winner() == AGENT else 0.0
-        self.log.n += 1.0
+            self.log.winrate += 1 if self.get_winner() == AGENT else 0
+        self.log.n += 1
 
     fn scripted_random_move(self):
         # Simple deterministic pseudo-random scan (no RNG dependency)
