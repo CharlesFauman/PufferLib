@@ -58,10 +58,6 @@ struct Checkers(Copyable, Movable):
     # Cached counts/flags
     var agent_pieces: Int32
     var opponent_pieces: Int32
-    var capture_available_cache: Int32
-    var capture_available_valid: Int32
-    var game_over_cache: Int32
-    var game_over_valid: Int32
 
     # Logging
     var log: Log
@@ -83,10 +79,6 @@ struct Checkers(Copyable, Movable):
 
         self.agent_pieces = 0
         self.opponent_pieces = 0
-        self.capture_available_cache = 0
-        self.capture_available_valid = 0
-        self.game_over_cache = 0
-        self.game_over_valid = 0
 
         self.log = Log()
 
@@ -144,8 +136,6 @@ struct Checkers(Copyable, Movable):
         move_type: Int32 = action % num_move_types
 
         var m = Move(from_=Position(r=pos / self.size, c=pos % self.size), to=Position(r=0, c=0))
-        m.to.r = m.from_.r
-        m.to.c = m.from_.c
 
         if move_type == 0:
             m.to.r = m.from_.r - 1; m.to.c = m.from_.c - 1
@@ -186,10 +176,7 @@ struct Checkers(Copyable, Movable):
                 return False
         return True
 
-    fn capture_available(mut self) -> Bool:
-        if self.capture_available_valid == 1:
-            return self.capture_available_cache == 1
-
+    fn capture_available(self) -> Bool:
         current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
         current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
 
@@ -218,16 +205,11 @@ struct Checkers(Copyable, Movable):
                     valid_dir = 1 if self.current_player == AGENT else -1
                     if move_dir != valid_dir:
                         continue
-                    self.capture_available_cache = 1
-                    self.capture_available_valid = 1
                     return True
-        self.capture_available_cache = 0
-        self.capture_available_valid = 1
         return False
 
     fn is_valid_move(self, m: Move) -> Bool:
-        capture_available = self.capture_available()
-        if capture_available and self.move_size(m) != 2:
+        if self.capture_available() and self.move_size(m) != 2:
             return False
         return self.is_valid_move_no_capture(m)
 
@@ -242,8 +224,6 @@ struct Checkers(Copyable, Movable):
                 o += 1
         self.agent_pieces = a
         self.opponent_pieces = o
-        self.capture_available_valid = 0
-        self.game_over_valid = 0
 
     fn try_make_king(mut self) -> Bool:
         var promoted = False
@@ -258,25 +238,18 @@ struct Checkers(Copyable, Movable):
             if self.observations[idx] == UInt8(AGENT_PAWN):
                 self.observations[idx] = UInt8(AGENT_KING)
                 promoted = True
-        if promoted:
-            self.capture_available_valid = 0
-            self.game_over_valid = 0
         return promoted
 
     fn num_pieces_by_player(self, player: Int32) -> Int32:
         return self.agent_pieces if player == AGENT else self.opponent_pieces
 
-    fn is_game_over(mut self) -> Bool:
-        if self.game_over_valid == 1:
-            return self.game_over_cache == 1
+    fn is_game_over(self) -> Bool:
         cur_p = self.num_pieces_by_player(self.current_player)
         other = AGENT if self.current_player == OPPONENT else OPPONENT
         oth_p = self.num_pieces_by_player(other)
         if cur_p == 0 or oth_p == 0:
-            self.game_over_cache = 1; self.game_over_valid = 1
             return True
         if self.capture_available():
-            self.game_over_cache = 0; self.game_over_valid = 1
             return False
         # check any simple move available
         current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
@@ -300,9 +273,7 @@ struct Checkers(Copyable, Movable):
                     valid_dir = 1 if self.current_player == AGENT else -1
                     if move_dir != valid_dir:
                         continue
-                self.game_over_cache = 0; self.game_over_valid = 1
                 return False
-        self.game_over_cache = 1; self.game_over_valid = 1
         return True
 
     fn get_winner(self) -> Int32:
@@ -351,8 +322,6 @@ struct Checkers(Copyable, Movable):
                 reward -= 0.05
             elif captured_piece == OPPONENT_PAWN or captured_piece == OPPONENT_KING:
                 self.opponent_pieces -= 1
-        self.capture_available_valid = 0
-        self.game_over_valid = 0
 
         promoted = self.try_make_king()
         if capture_occurred and self.current_player == OPPONENT:
@@ -410,7 +379,7 @@ struct Checkers(Copyable, Movable):
             self.log.winrate += 1 if self.get_winner() == AGENT else 0
         self.log.n += 1
 
-    fn scripted_random_move(self):
+    fn scripted_random_move(mut self):
         # Simple deterministic pseudo-random scan (no RNG dependency)
         current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
         current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
@@ -451,7 +420,7 @@ struct Checkers(Copyable, Movable):
                 return
         # If no move found, leave as-is.
 
-    fn scripted_step(self, difficulty: Int32):
+    fn scripted_step(mut self, difficulty: Int32):
         # 0 and 1 both map to a simple policy in this port
         self.scripted_random_move()
 
