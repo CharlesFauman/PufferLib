@@ -374,9 +374,9 @@ struct Checkers(Copyable, Movable):
         if self.is_game_over():
             self.terminals[0] = 1
             winner = self.get_winner()
-            reward = 1.0 if winner == AGENT else -1.0
+            reward = 1 if winner == AGENT else -1
 
-        self.rewards[0] = clamp(reward, -1.0, 1.0)
+        self.rewards[0] = clamp(reward, -1, 1)
 
     # --- API matching the C names ---
     fn c_reset(mut self):
