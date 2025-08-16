@@ -12,7 +12,7 @@ alias AGENT_KING: Int32 = 2
 alias OPPONENT_PAWN: Int32 = 3
 alias OPPONENT_KING: Int32 = 4
 
-struct Log:
+struct Log(Copyable, Movable):
     var perf: Float32
     var score: Float32
     var episode_return: Float32
@@ -20,7 +20,7 @@ struct Log:
     var winrate: Float32
     var n: Float32
 
-    def __init__(out self):
+    fn __init__(out self):
         self.perf = 0.0
         self.score = 0.0
         self.episode_return = 0.0
@@ -43,7 +43,7 @@ fn clamp(val: Float32, low: Float32, high: Float32) -> Float32:
     return Float32(min(max(val, low), high))
 
 # The environment state.
-struct Checkers:
+struct Checkers(Copyable, Movable):
     # Buffers
     var observations: List[UInt8]
     var actions: List[Int32]          # length >= 1 (single-discrete action)
@@ -66,7 +66,7 @@ struct Checkers:
     # Logging
     var log: Log
 
-    def __init__(out self,
+    fn __init__(out self,
                  observations: List[UInt8],
                  actions: List[Int32],
                  rewards: List[Float32],
@@ -485,10 +485,10 @@ struct Checkers:
 fn make_env(size: Int32 = 8) -> Checkers:
     tiles = size * size
     env = Checkers(
-        observations = List[UInt8](length=tiles, fill=0),
-        actions      = List[Int32](fill=0, length=1),
-        rewards      = List[Float32](fill=0, length=1),
-        terminals    = List[UInt8](fill=0, length=1),
+        observations = List[UInt8](length=UInt(tiles), fill=0),
+        actions      = List[Int32](length=1, fill=0),
+        rewards      = List[Float32](length=1, fill=0),
+        terminals    = List[UInt8](length=1, fill=0),
         size         = size,
     )
     env.c_reset()
