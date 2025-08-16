@@ -1,6 +1,6 @@
-# NOTE: This is a Mojo reimplementation of the core game logic from the C files.
+# NOTE: This is a Mojo reimplementation of the core game logic from_ the C files.
 # It intentionally omits Raylib rendering; render() is a no-op. The focus is on
-# parity with your step/reset/game-rules behavior so it can be called from Python
+# parity with your step/reset/game-rules behavior so it can be called from_ Python
 # via `mojo.importer`.
 
 # --- Constants (mirroring the C defines) ---
@@ -35,7 +35,7 @@ struct Position(Copyable, Movable):
 
 @fieldwise_init
 struct Move(Copyable, Movable):
-    var `from`: Position
+    var from_: Position
     var to: Position
 
 @always_inline
@@ -52,19 +52,43 @@ struct Checkers:
 
     # Config/state
     var size: Int32
-    var tick: Int32 = 0
-    var current_player: Int32 = AGENT
+    var tick: Int32
+    var current_player: Int32
 
     # Cached counts/flags
-    var agent_pieces: Int32 = 0
-    var opponent_pieces: Int32 = 0
-    var capture_available_cache: Int32 = 0
-    var capture_available_valid: Int32 = 0
-    var game_over_cache: Int32 = 0
-    var game_over_valid: Int32 = 0
+    var agent_pieces: Int32
+    var opponent_pieces: Int32
+    var capture_available_cache: Int32
+    var capture_available_valid: Int32
+    var game_over_cache: Int32
+    var game_over_valid: Int32
 
     # Logging
-    var log: Log = Log()
+    var log: Log
+
+    def __init__(out self,
+                 observations: List[UInt8],
+                 actions: List[Int32],
+                 rewards: List[Float32],
+                 terminals: List[UInt8],
+                 size: Int32):
+        self.observations = observations
+        self.actions = actions
+        self.rewards = rewards
+        self.terminals = terminals
+        self.size = size
+        self.tick = 0
+
+        self.current_player = AGENT
+
+        self.agent_pieces = 0
+        self.opponent_pieces = 0
+        self.capture_available_cache = 0
+        self.capture_available_valid = 0
+        self.game_over_cache = 0
+        self.game_over_valid = 0
+
+        self.log = Log()
 
     # --- Helpers ---
     @always_inline
@@ -93,11 +117,11 @@ struct Checkers:
 
     @always_inline
     fn move_direction(self, m: Move) -> Int32:
-        return 1 if m.to.r > m.from.r else -1
+        return 1 if m.to.r > m.from_.r else -1
 
     @always_inline
     fn valid_move_direction(self, m: Move) -> Bool:
-        piece = self.get_piece(m.from)
+        piece = self.get_piece(m.from_)
         if piece == AGENT_PAWN:
             return self.move_direction(m) == 1
         if piece == OPPONENT_PAWN:
@@ -106,45 +130,45 @@ struct Checkers:
 
     @always_inline
     fn is_diagonal_move(self, m: Move) -> Bool:
-        dr = m.to.r - m.from.r
-        dc = m.to.c - m.from.c
+        dr = m.to.r - m.from_.r
+        dc = m.to.c - m.from_.c
         return (dr == dc) or (dr == -dc)
 
     @always_inline
     fn move_size(self, m: Move) -> Int32:
-        return abs(m.from.r - m.to.r)
+        return abs(m.from_.r - m.to.r)
 
     fn decode_action(self, action: Int32) -> Move:
         num_move_types: Int32 = 8
         pos: Int32 = action / num_move_types
         move_type: Int32 = action % num_move_types
 
-        var m = Move(from=Position(r=pos / self.size, c=pos % self.size), to=Position(r=0, c=0))
-        m.to.r = m.from.r
-        m.to.c = m.from.c
+        var m = Move(from_=Position(r=pos / self.size, c=pos % self.size), to=Position(r=0, c=0))
+        m.to.r = m.from_.r
+        m.to.c = m.from_.c
 
         if move_type == 0:
-            m.to.r = m.from.r - 1; m.to.c = m.from.c - 1
+            m.to.r = m.from_.r - 1; m.to.c = m.from_.c - 1
         elif move_type == 1:
-            m.to.r = m.from.r - 1; m.to.c = m.from.c + 1
+            m.to.r = m.from_.r - 1; m.to.c = m.from_.c + 1
         elif move_type == 2:
-            m.to.r = m.from.r + 1; m.to.c = m.from.c - 1
+            m.to.r = m.from_.r + 1; m.to.c = m.from_.c - 1
         elif move_type == 3:
-            m.to.r = m.from.r + 1; m.to.c = m.from.c + 1
+            m.to.r = m.from_.r + 1; m.to.c = m.from_.c + 1
         elif move_type == 4:
-            m.to.r = m.from.r - 2; m.to.c = m.from.c - 2
+            m.to.r = m.from_.r - 2; m.to.c = m.from_.c - 2
         elif move_type == 5:
-            m.to.r = m.from.r - 2; m.to.c = m.from.c + 2
+            m.to.r = m.from_.r - 2; m.to.c = m.from_.c + 2
         elif move_type == 6:
-            m.to.r = m.from.r + 2; m.to.c = m.from.c - 2
+            m.to.r = m.from_.r + 2; m.to.c = m.from_.c - 2
         else:
-            m.to.r = m.from.r + 2; m.to.c = m.from.c + 2
+            m.to.r = m.from_.r + 2; m.to.c = m.from_.c + 2
         return m
 
     fn is_valid_move_no_capture(self, m: Move) -> Bool:
-        if not self.in_bounds(m.from) or not self.in_bounds(m.to):
+        if not self.in_bounds(m.from_) or not self.in_bounds(m.to):
             return False
-        if self.get_piece_type(m.from) != self.current_player:
+        if self.get_piece_type(m.from_) != self.current_player:
             return False
         if self.get_piece(m.to) != EMPTY:
             return False
@@ -157,7 +181,7 @@ struct Checkers:
             return False
         if ms == 2:
             other = AGENT if self.current_player == OPPONENT else OPPONENT
-            between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
+            between = Position(r=(m.from_.r + m.to.r) // 2, c=(m.from_.c + m.to.c) // 2)
             if self.get_piece_type(between) != other:
                 return False
         return True
@@ -309,15 +333,15 @@ struct Checkers:
         if not self.is_valid_move(m):
             self.rewards[0] = -1.0
             return
-        moving_piece = self.get_piece(m.from)
-        self.observations[self.p2i(m.from)] = UInt8(EMPTY)
+        moving_piece = self.get_piece(m.from_)
+        self.observations[self.p2i(m.from_)] = UInt8(EMPTY)
         self.observations[self.p2i(m.to)] = UInt8(moving_piece)
 
         var capture_occurred = False
         var reward: Float32 = 0.0
 
         if self.move_size(m) == 2:
-            between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
+            between = Position(r=(m.from_.r + m.to.r) // 2, c=(m.from_.c + m.to.c) // 2)
             captured_piece = Int32(self.observations[self.p2i(between)])
             self.observations[self.p2i(between)] = UInt8(EMPTY)
             capture_occurred = True
