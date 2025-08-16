@@ -186,7 +186,7 @@ struct Checkers(Copyable, Movable):
                 return False
         return True
 
-    fn capture_available(self) -> Bool:
+    fn capture_available(mut self) -> Bool:
         if self.capture_available_valid == 1:
             return self.capture_available_cache == 1
 
@@ -230,7 +230,7 @@ struct Checkers(Copyable, Movable):
             return False
         return self.is_valid_move_no_capture(m)
 
-    fn update_piece_counts(self):
+    fn update_piece_counts(mut self):
         var a: Int32 = 0
         var o: Int32 = 0
         for i in range(self.size * self.size):
@@ -244,7 +244,7 @@ struct Checkers(Copyable, Movable):
         self.capture_available_valid = 0
         self.game_over_valid = 0
 
-    fn try_make_king(self) -> Bool:
+    fn try_make_king(mut self) -> Bool:
         var promoted = False
         # Top row for opponent pawns -> kings
         for i in range(self.size):
@@ -265,7 +265,7 @@ struct Checkers(Copyable, Movable):
     fn num_pieces_by_player(self, player: Int32) -> Int32:
         return self.agent_pieces if player == AGENT else self.opponent_pieces
 
-    fn is_game_over(self) -> Bool:
+    fn is_game_over(mut self) -> Bool:
         if self.game_over_valid == 1:
             return self.game_over_cache == 1
         cur_p = self.num_pieces_by_player(self.current_player)
@@ -328,7 +328,7 @@ struct Checkers(Copyable, Movable):
                 score -= 2.0
         return score
 
-    fn make_move(self, action: Int32):
+    fn make_move(mut self, action: Int32):
         m = self.decode_action(action)
         if not self.is_valid_move(m):
             self.rewards[0] = -1.0
@@ -378,7 +378,7 @@ struct Checkers(Copyable, Movable):
         self.rewards[0] = clamp(reward, -1.0, 1.0)
 
     # --- API matching the C names ---
-    fn c_reset(self):
+    fn c_reset(mut self):
         self.tick = 0
         self.terminals[0] = 0
         self.rewards[0] = 0.0
@@ -400,7 +400,7 @@ struct Checkers(Copyable, Movable):
         self.current_player = AGENT
         self.update_piece_counts()
 
-    fn add_log(self):
+    fn add_log(mut self):
         self.log.perf += 1.0 if self.rewards[0] > 0 else 0.0
         self.log.score += self.evaluate_position()
         self.log.episode_length += Float32(self.tick)
@@ -454,7 +454,7 @@ struct Checkers(Copyable, Movable):
         # 0 and 1 both map to a simple policy in this port
         self.scripted_random_move()
 
-    fn c_step(self):
+    fn c_step(mut self):
         self.tick += 1
         action = self.actions[0]
         self.rewards[0] = 0.0
