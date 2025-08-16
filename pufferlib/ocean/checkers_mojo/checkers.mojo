@@ -450,22 +450,8 @@ struct Checkers(Copyable, Movable):
     fn c_close(self):
         # No dynamic graphics/window state to close in this Mojo port
         pass
+
 # --- Public constructors / helpers for Python interop ---
-
-fn make_env(py_obj: PythonObject) raises -> Checkers:
-    size = Int(py_obj)
-
-    tiles = size * size
-    env = Checkers(
-        observations = List[UInt8](length=UInt(tiles), fill=0),
-        actions      = List[Int32](length=1, fill=0),
-        rewards      = List[Float32](length=1, fill=0),
-        terminals    = List[UInt8](length=1, fill=0),
-        size         = size,
-    )
-    env.c_reset()
-    return env
-
 from python import PythonObject
 from python.bindings import PythonModuleBuilder
 import math
@@ -479,3 +465,17 @@ fn PyInit_checkers_mojo() -> PythonObject:
         return m.finalize()
     except e:
         return abort[PythonObject](String("error creating Python Mojo module checkers_mojo:", e))
+
+fn make_env(py_obj: PythonObject) raises -> PythonObject:
+    size = Int(py_obj)
+
+    tiles = size * size
+    env = Checkers(
+        observations = List[UInt8](length=UInt(tiles), fill=0),
+        actions      = List[Int32](length=1, fill=0),
+        rewards      = List[Float32](length=1, fill=0),
+        terminals    = List[UInt8](length=1, fill=0),
+        size         = size,
+    )
+    env.c_reset()
+    return PythonObject(alloc=env^)
