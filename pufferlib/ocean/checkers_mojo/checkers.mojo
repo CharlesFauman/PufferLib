@@ -28,15 +28,17 @@ struct Log:
         self.winrate = 0.0
         self.n = 0.0
 
-struct Position:
+@fieldwise_init
+struct Position(Copyable, Movable):
     var r: Int32
     var c: Int32
 
-struct Move:
-    var from: Position
+@fieldwise_init
+struct Move(Copyable, Movable):
+    var `from`: Position
     var to: Position
 
-@inline
+@always_inline
 fn clamp(val: Float32, low: Float32, high: Float32) -> Float32:
     return Float32(min(max(val, low), high))
 
@@ -65,57 +67,57 @@ struct Checkers:
     var log: Log = Log()
 
     # --- Helpers ---
-    @inline
+    @always_inline
     fn p2i(self, p: Position) -> Int32:
         return p.r * self.size + p.c
 
-    @inline
+    @always_inline
     fn in_bounds(self, p: Position) -> Bool:
         return p.r >= 0 and p.r < self.size and p.c >= 0 and p.c < self.size
 
-    @inline
+    @always_inline
     fn get_piece(self, p: Position) -> Int32:
         if not self.in_bounds(p):
             return EMPTY
-        let idx = self.p2i(p)
+        idx = self.p2i(p)
         return Int32(self.observations[idx])
 
-    @inline
+    @always_inline
     fn get_piece_type(self, p: Position) -> Int32:
-        let piece = self.get_piece(p)
+        piece = self.get_piece(p)
         if piece == AGENT_PAWN or piece == AGENT_KING:
             return AGENT
         if piece == OPPONENT_PAWN or piece == OPPONENT_KING:
             return OPPONENT
         return EMPTY
 
-    @inline
+    @always_inline
     fn move_direction(self, m: Move) -> Int32:
         return 1 if m.to.r > m.from.r else -1
 
-    @inline
+    @always_inline
     fn valid_move_direction(self, m: Move) -> Bool:
-        let piece = self.get_piece(m.from)
+        piece = self.get_piece(m.from)
         if piece == AGENT_PAWN:
             return self.move_direction(m) == 1
         if piece == OPPONENT_PAWN:
             return self.move_direction(m) == -1
         return True
 
-    @inline
+    @always_inline
     fn is_diagonal_move(self, m: Move) -> Bool:
-        let dr = m.to.r - m.from.r
-        let dc = m.to.c - m.from.c
+        dr = m.to.r - m.from.r
+        dc = m.to.c - m.from.c
         return (dr == dc) or (dr == -dc)
 
-    @inline
+    @always_inline
     fn move_size(self, m: Move) -> Int32:
         return abs(m.from.r - m.to.r)
 
     fn decode_action(self, action: Int32) -> Move:
-        let num_move_types: Int32 = 8
-        let pos: Int32 = action / num_move_types
-        let move_type: Int32 = action % num_move_types
+        num_move_types: Int32 = 8
+        pos: Int32 = action / num_move_types
+        move_type: Int32 = action % num_move_types
 
         var m = Move(from=Position(r=pos / self.size, c=pos % self.size), to=Position(r=0, c=0))
         m.to.r = m.from.r
@@ -150,12 +152,12 @@ struct Checkers:
             return False
         if not self.is_diagonal_move(m):
             return False
-        let ms = self.move_size(m)
+        ms = self.move_size(m)
         if ms != 1 and ms != 2:
             return False
         if ms == 2:
-            let other = AGENT if self.current_player == OPPONENT else OPPONENT
-            let between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
+            other = AGENT if self.current_player == OPPONENT else OPPONENT
+            between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
             if self.get_piece_type(between) != other:
                 return False
         return True
@@ -164,32 +166,32 @@ struct Checkers:
         if self.capture_available_valid == 1:
             return self.capture_available_cache == 1
 
-        let current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
-        let current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
+        current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
+        current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
 
         for i in range(self.size * self.size):
-            let piece = Int32(self.observations[i])
+            piece = Int32(self.observations[i])
             if piece != current_pawn and piece != current_king:
                 continue
-            let r = i / self.size
-            let c = i % self.size
+            r = i / self.size
+            c = i % self.size
 
-            let dirs = [( -2, -2), (-2,  2), ( 2, -2), ( 2,  2)]
+            dirs = [( -2, -2), (-2,  2), ( 2, -2), ( 2,  2)]
             for d in dirs:
-                let new_r = r + d[0]
-                let new_c = c + d[1]
+                new_r = r + d[0]
+                new_c = c + d[1]
                 if new_r < 0 or new_r >= self.size or new_c < 0 or new_c >= self.size:
                     continue
                 if self.observations[new_r * self.size + new_c] != 0:
                     continue
-                let mid_r = r + d[0] // 2
-                let mid_c = c + d[1] // 2
-                let mid_piece = Int32(self.observations[mid_r * self.size + mid_c])
-                let opp_pawn = OPPONENT_PAWN if self.current_player == AGENT else AGENT_PAWN
-                let opp_king = OPPONENT_KING if self.current_player == AGENT else AGENT_KING
+                mid_r = r + d[0] // 2
+                mid_c = c + d[1] // 2
+                mid_piece = Int32(self.observations[mid_r * self.size + mid_c])
+                opp_pawn = OPPONENT_PAWN if self.current_player == AGENT else AGENT_PAWN
+                opp_king = OPPONENT_KING if self.current_player == AGENT else AGENT_KING
                 if mid_piece == opp_pawn or mid_piece == opp_king:
-                    let move_dir = 1 if d[0] > 0 else -1
-                    let valid_dir = 1 if self.current_player == AGENT else -1
+                    move_dir = 1 if d[0] > 0 else -1
+                    valid_dir = 1 if self.current_player == AGENT else -1
                     if move_dir != valid_dir:
                         continue
                     self.capture_available_cache = 1
@@ -208,7 +210,7 @@ struct Checkers:
         var a: Int32 = 0
         var o: Int32 = 0
         for i in range(self.size * self.size):
-            let piece = Int32(self.observations[i])
+            piece = Int32(self.observations[i])
             if piece == AGENT_PAWN or piece == AGENT_KING:
                 a += 1
             elif piece == OPPONENT_PAWN or piece == OPPONENT_KING:
@@ -227,7 +229,7 @@ struct Checkers:
                 promoted = True
         # Bottom row for agent pawns -> kings
         for i in range(self.size):
-            let idx = self.size * (self.size - 1) + i
+            idx = self.size * (self.size - 1) + i
             if self.observations[idx] == UInt8(AGENT_PAWN):
                 self.observations[idx] = UInt8(AGENT_KING)
                 promoted = True
@@ -242,9 +244,9 @@ struct Checkers:
     fn is_game_over(self) -> Bool:
         if self.game_over_valid == 1:
             return self.game_over_cache == 1
-        let cur_p = self.num_pieces_by_player(self.current_player)
-        let other = AGENT if self.current_player == OPPONENT else OPPONENT
-        let oth_p = self.num_pieces_by_player(other)
+        cur_p = self.num_pieces_by_player(self.current_player)
+        other = AGENT if self.current_player == OPPONENT else OPPONENT
+        oth_p = self.num_pieces_by_player(other)
         if cur_p == 0 or oth_p == 0:
             self.game_over_cache = 1; self.game_over_valid = 1
             return True
@@ -252,25 +254,25 @@ struct Checkers:
             self.game_over_cache = 0; self.game_over_valid = 1
             return False
         # check any simple move available
-        let current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
-        let current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
+        current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
+        current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
         for i in range(self.size * self.size):
-            let piece = Int32(self.observations[i])
+            piece = Int32(self.observations[i])
             if piece != current_pawn and piece != current_king:
                 continue
-            let r = i / self.size
-            let c = i % self.size
-            let dirs = [(-1,-1),(-1,1),(1,-1),(1,1)]
+            r = i / self.size
+            c = i % self.size
+            dirs = [(-1,-1),(-1,1),(1,-1),(1,1)]
             for d in dirs:
-                let nr = r + d[0]
-                let nc = c + d[1]
+                nr = r + d[0]
+                nc = c + d[1]
                 if nr < 0 or nr >= self.size or nc < 0 or nc >= self.size:
                     continue
                 if self.observations[nr*self.size+nc] != 0:
                     continue
                 if piece == current_pawn:
-                    let move_dir = 1 if d[0] > 0 else -1
-                    let valid_dir = 1 if self.current_player == AGENT else -1
+                    move_dir = 1 if d[0] > 0 else -1
+                    valid_dir = 1 if self.current_player == AGENT else -1
                     if move_dir != valid_dir:
                         continue
                 self.game_over_cache = 0; self.game_over_valid = 1
@@ -290,8 +292,8 @@ struct Checkers:
     fn evaluate_position(self) -> Float32:
         var score: Float32 = 0.0
         for i in range(self.size * self.size):
-            let piece = Int32(self.observations[i])
-            let r = i / self.size
+            piece = Int32(self.observations[i])
+            r = i / self.size
             if piece == AGENT_PAWN:
                 score += 1.0 + Float32(r) * 0.1
             elif piece == AGENT_KING:
@@ -303,11 +305,11 @@ struct Checkers:
         return score
 
     fn make_move(self, action: Int32):
-        let m = self.decode_action(action)
+        m = self.decode_action(action)
         if not self.is_valid_move(m):
             self.rewards[0] = -1.0
             return
-        let moving_piece = self.get_piece(m.from)
+        moving_piece = self.get_piece(m.from)
         self.observations[self.p2i(m.from)] = UInt8(EMPTY)
         self.observations[self.p2i(m.to)] = UInt8(moving_piece)
 
@@ -315,8 +317,8 @@ struct Checkers:
         var reward: Float32 = 0.0
 
         if self.move_size(m) == 2:
-            let between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
-            let captured_piece = Int32(self.observations[self.p2i(between)])
+            between = Position(r=(m.from.r + m.to.r) // 2, c=(m.from.c + m.to.c) // 2)
+            captured_piece = Int32(self.observations[self.p2i(between)])
             self.observations[self.p2i(between)] = UInt8(EMPTY)
             capture_occurred = True
             if captured_piece == AGENT_PAWN or captured_piece == AGENT_KING:
@@ -327,7 +329,7 @@ struct Checkers:
         self.capture_available_valid = 0
         self.game_over_valid = 0
 
-        let promoted = self.try_make_king()
+        promoted = self.try_make_king()
         if capture_occurred and self.current_player == OPPONENT:
             reward += 0.1
         elif self.current_player == AGENT:
@@ -339,14 +341,14 @@ struct Checkers:
         if promoted:
             # Bonus if an agent king exists on bottom row
             for i in range(self.size):
-                let idx = self.size * (self.size - 1) + i
+                idx = self.size * (self.size - 1) + i
                 if self.observations[idx] == UInt8(AGENT_KING):
                     reward += 0.05
                     break
 
         if self.is_game_over():
             self.terminals[0] = 1
-            let winner = self.get_winner()
+            winner = self.get_winner()
             reward = 1.0 if winner == AGENT else -1.0
 
         self.rewards[0] = clamp(reward, -1.0, 1.0)
@@ -357,7 +359,7 @@ struct Checkers:
         self.terminals[0] = 0
         self.rewards[0] = 0.0
 
-        let tiles = self.size * self.size
+        tiles = self.size * self.size
         for i in range(tiles):
             self.observations[i] = 0
 
@@ -385,41 +387,41 @@ struct Checkers:
 
     fn scripted_random_move(self):
         # Simple deterministic pseudo-random scan (no RNG dependency)
-        let current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
-        let current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
-        let has_caps = self.capture_available()
-        let dirs = [(-1,-1),(-1,1),(1,-1),(1,1),(-2,-2),(-2,2),(2,-2),(2,2)]
+        current_pawn = AGENT_PAWN if self.current_player == AGENT else OPPONENT_PAWN
+        current_king = AGENT_KING if self.current_player == AGENT else OPPONENT_KING
+        has_caps = self.capture_available()
+        dirs = [(-1,-1),(-1,1),(1,-1),(1,1),(-2,-2),(-2,2),(2,-2),(2,2)]
         for i in range(self.size * self.size):
-            let piece = Int32(self.observations[i])
+            piece = Int32(self.observations[i])
             if piece != current_pawn and piece != current_king:
                 continue
-            let r = i / self.size
-            let c = i % self.size
+            r = i / self.size
+            c = i % self.size
             for d_idx in range(len(dirs)):
-                let d = dirs[d_idx]
-                let nr = r + d[0]
-                let nc = c + d[1]
+                d = dirs[d_idx]
+                nr = r + d[0]
+                nc = c + d[1]
                 if nr < 0 or nr >= self.size or nc < 0 or nc >= self.size:
                     continue
                 if self.observations[nr*self.size+nc] != 0:
                     continue
-                let step_sz = abs(d[0])
+                step_sz = abs(d[0])
                 if has_caps and step_sz != 2:
                     continue
                 if piece == current_pawn:
-                    let move_dir = 1 if d[0] > 0 else -1
-                    let valid_dir = 1 if self.current_player == AGENT else -1
+                    move_dir = 1 if d[0] > 0 else -1
+                    valid_dir = 1 if self.current_player == AGENT else -1
                     if move_dir != valid_dir:
                         continue
                 if step_sz == 2:
-                    let mid_r = r + d[0] // 2
-                    let mid_c = c + d[1] // 2
-                    let mid_piece = Int32(self.observations[mid_r*self.size+mid_c])
-                    let opp_pawn = OPPONENT_PAWN if self.current_player == AGENT else AGENT_PAWN
-                    let opp_king = OPPONENT_KING if self.current_player == AGENT else AGENT_KING
+                    mid_r = r + d[0] // 2
+                    mid_c = c + d[1] // 2
+                    mid_piece = Int32(self.observations[mid_r*self.size+mid_c])
+                    opp_pawn = OPPONENT_PAWN if self.current_player == AGENT else AGENT_PAWN
+                    opp_king = OPPONENT_KING if self.current_player == AGENT else AGENT_KING
                     if mid_piece != opp_pawn and mid_piece != opp_king:
                         continue
-                let action = i * 8 + d_idx
+                action = i * 8 + d_idx
                 self.make_move(action)
                 return
         # If no move found, leave as-is.
@@ -430,7 +432,7 @@ struct Checkers:
 
     fn c_step(self):
         self.tick += 1
-        let action = self.actions[0]
+        action = self.actions[0]
         self.rewards[0] = 0.0
         self.terminals[0] = 0
 
@@ -457,12 +459,12 @@ struct Checkers:
 # --- Public constructors / helpers for Python interop ---
 
 fn make_env(size: Int32 = 8) -> Checkers:
-    let tiles = size * size
-    var env = Checkers(
-        observations = List[UInt8](repeating: 0, count: tiles),
-        actions      = List[Int32](repeating: 0, count: 1),
-        rewards      = List[Float32](repeating: 0.0, count: 1),
-        terminals    = List[UInt8](repeating: 0, count: 1),
+    tiles = size * size
+    env = Checkers(
+        observations = List[UInt8](length=tiles, fill=0),
+        actions      = List[Int32](fill=0, length=1),
+        rewards      = List[Float32](fill=0, length=1),
+        terminals    = List[UInt8](fill=0, length=1),
         size         = size,
     )
     env.c_reset()
