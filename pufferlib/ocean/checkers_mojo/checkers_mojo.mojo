@@ -43,7 +43,7 @@ fn clamp(val: Float32, low: Float32, high: Float32) -> Float32:
     return Float32(min(max(val, low), high))
 
 # The environment state.
-struct Checkers(Copyable, Movable):
+struct Checkers(Copyable, Movable, Representable):
     # Buffers
     var observations: List[UInt8]
     var actions: List[Int32]          # length >= 1 (single-discrete action)
@@ -61,6 +61,11 @@ struct Checkers(Copyable, Movable):
 
     # Logging
     var log: Log
+
+    fn __repr__(self) -> String:
+        return String("Checkers(size=", self.size, ", tick=", self.tick,
+                      ", current_player=", self.current_player, ", agent_pieces=", self.agent_pieces,
+                      ", opponent_pieces=", self.opponent_pieces, ")")
 
     fn __init__(out self,
                  observations: List[UInt8],
@@ -451,17 +456,75 @@ struct Checkers(Copyable, Movable):
         # No dynamic graphics/window state to close in this Mojo port
         pass
 
+    fn c_set_actions(mut self, actions: List[Int32]):
+        self.actions = actions
+
 # --- Public constructors / helpers for Python interop ---
 from python import PythonObject
 from python.bindings import PythonModuleBuilder
 import math
 from os import abort
 
+
+fn checkers_c_reset(py_self: PythonObject) raises -> None:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    self_ptr[].c_reset()
+
+fn checkers_c_step(py_self: PythonObject) raises -> None:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    self_ptr[].c_step()
+
+fn checkers_c_render(py_self: PythonObject) raises -> None:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    self_ptr[].c_render()
+
+fn checkers_c_close(py_self: PythonObject) raises -> None:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    self_ptr[].c_close()
+
+from python import Python
+fn checkers_c_set_actions(py_self: PythonObject, actions: PythonObject) raises -> None:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+
+    self_ptr[].c_set_actions([Int32(v) for v in Python.list(actions)])
+
+fn checkers_get_observations(py_self: PythonObject) raises -> PythonObject:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    return ",".join(([i for i in self_ptr[].observations]))
+
+
+fn checkers_get_actions(py_self: PythonObject) raises -> PythonObject:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    return ",".join(([i for i in self_ptr[].actions]))
+
+fn checkers_get_rewards(py_self: PythonObject) raises -> PythonObject:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    return ",".join(([i for i in self_ptr[].rewards]))
+
+fn checkers_get_terminals(py_self: PythonObject) raises -> PythonObject:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    return ",".join(([i for i in self_ptr[].terminals]))
+
+fn checkers_get_size(py_self: PythonObject) raises -> PythonObject:
+    var self_ptr = py_self.downcast_value_ptr[Checkers]()
+    return Int(self_ptr[].size)
+
 @export
 fn PyInit_checkers_mojo() -> PythonObject:
     try:
         var m = PythonModuleBuilder("checkers_mojo")
         m.def_function[make_env]("make_env", docstring="make a new Checkers environment")
+        _ = m.add_type[Checkers]("Checkers")
+            .def_method[checkers_c_reset]("c_reset")
+            .def_method[checkers_c_step]("c_step")
+            .def_method[checkers_c_render]("c_render")
+            .def_method[checkers_c_close]("c_close")
+            .def_method[checkers_c_set_actions]("c_set_actions")
+            .def_method[checkers_get_observations]("get_observations")
+            .def_method[checkers_get_actions]("get_actions")
+            .def_method[checkers_get_rewards]("get_rewards")
+            .def_method[checkers_get_terminals]("get_terminals")
+            .def_method[checkers_get_size]("get_size")
         return m.finalize()
     except e:
         return abort[PythonObject](String("error creating Python Mojo module checkers_mojo:", e))

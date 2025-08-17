@@ -1,24 +1,24 @@
 # Python wrapper that mirrors your checkers.py shape, but calls into Mojo.
-# Requires: `pip install mojo-importer` (or use the Modular toolchain that ships it)
-import mojo.importer  # type: ignore
-
 import gymnasium as gym
 import numpy as np
 
-try:
-    import mojo.importer  # type: ignore
-except Exception as e:
-    raise ImportError(
-        "Mojo importer not available. Make sure you're running within a Modular/Mojo environment "
-        "or have `mojo` tooling installed."
-    ) from e
-
-# Ensure current dir is importable for the .mojo file
+import os
 import sys
-sys.path.insert(0, "")
+
+# The Mojo importer module will handle compilation of the Mojo files.
+import mojo.importer  # noqa: F401
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
 # Import the Mojo module named `checkers` (from checkers.mojo)
-import checkers
+import checkers_mojo
+
+def mojo_to_numpy(mojo_list, dtype):
+    """
+    Convert a Mojo list to a numpy array.
+    """
+    return np.array(mojo_list.split(","), dtype=dtype)
 
 class CheckersMojoEnv:
     """
@@ -28,7 +28,7 @@ class CheckersMojoEnv:
     def __init__(self, size: int = 8):
         self.size = int(size)
         # Construct the Mojo env
-        self._env = checkers.make_env(self.size)
+        self._env = checkers_mojo.make_env(self.size)
 
         # Expose buffers as numpy arrays that view/copy from Mojo lists as needed
         self.single_observation_space = gym.spaces.Box(low=0, high=1, shape=(self.size * self.size,), dtype=np.uint8)
@@ -36,24 +36,23 @@ class CheckersMojoEnv:
 
     @property
     def observations(self) -> np.ndarray:
-        # Convert Mojo List[UInt8] -> numpy (copy; Mojo lists aren't memoryview-compatible)
-        return np.frombuffer(bytes(self._env.observations), dtype=np.uint8)
+        return mojo_to_numpy(self._env.get_observations(), np.uint8)
 
     @property
     def rewards(self) -> np.ndarray:
-        return np.array([float(self._env.rewards[0])], dtype=np.float32)
+        return mojo_to_numpy(self._env.get_rewards(), np.float32)
 
     @property
     def terminals(self) -> np.ndarray:
-        return np.array([int(self._env.terminals[0])], dtype=np.uint8)
+        return mojo_to_numpy(self._env.get_terminals(), np.uint8)
 
     def reset(self, seed: int | None = None):
         self._env.c_reset()
         return self.observations, {}
 
-    def step(self, action: int):
+    def step(self, actions):
         # Write action into Mojo env
-        self._env.actions[0] = int(action)
+        self._env.c_set_actions(actions)
         self._env.c_step()
         return self.observations, self.rewards, self.terminals, np.array([0], dtype=np.uint8), {}
 
@@ -71,7 +70,7 @@ if __name__ == "__main__":
     done = False
     total = 0.0
 
-    for _ in range(200):
+    for _ in range(20000):
         action = np.random.randint(0, env.single_action_space.n)
         obs, rew, term, trunc, info = env.step(action)
         total += float(rew[0])
